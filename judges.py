@@ -2,7 +2,7 @@ from fastchat.model import get_conversation_template
 import re
 from system_prompts import get_judge_system_prompt
 
-# from language_models import GPT
+from language_models import GPT
 
 
 def load_judge(args):
