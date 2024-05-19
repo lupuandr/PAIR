@@ -1,18 +1,20 @@
-from fastchat.model import (
-    get_conversation_template
-)
+from fastchat.model import get_conversation_template
 import re
 from system_prompts import get_judge_system_prompt
 
 from language_models import GPT
+
 
 def load_judge(args):
     if "gpt" in args.judge_model:
         return GPTJudge(args)
     elif args.judge_model == "no-judge":
         return NoJudge(args)
+    elif "celery" in args.judge_model:
+        return CeleryJudge(args)
     else:
         raise NotImplementedError
+
 
 class JudgeBase:
     def __init__(self, args):
@@ -30,14 +32,15 @@ class JudgeBase:
         raise NotImplementedError
 
     def process_output(self, raw_output):
-        pattern = r'\[\[(\d+)\]\]'
+        pattern = r"\[\[(\d+)\]\]"
         match = re.search(pattern, raw_output)
         output = int(match.group(1)) if match else None
         if output is None:
-            print(f"Error in processing judge output: {raw_output}" )
+            print(f"Error in processing judge output: {raw_output}")
             output = 1
         return output
-               
+
+
 class NoJudge(JudgeBase):
     def __init__(self, args):
         super(NoJudge, self).__init__(args)
@@ -46,10 +49,11 @@ class NoJudge(JudgeBase):
     def score(self, prompt_list, response_list):
         return [1 for _ in prompt_list]
 
+
 class GPTJudge(JudgeBase):
     def __init__(self, args):
         super(GPTJudge, self).__init__(args)
-        self.judge_model = GPT(model_name = self.judge_name)
+        self.judge_model = GPT(model_name=self.judge_name)
 
     def create_conv(self, full_prompt):
         conv = get_conversation_template(self.judge_name)
@@ -58,14 +62,46 @@ class GPTJudge(JudgeBase):
         return conv.to_openai_api_messages()
 
     def score(self, attack_prompt_list, target_response_list):
-        convs_list = [self.create_conv(self.get_judge_prompt(prompt, response)) for prompt, response in zip(attack_prompt_list, target_response_list)]
-        raw_outputs = self.judge_model.batched_generate(convs_list, 
-                                                        max_n_tokens = self.max_n_tokens,
-                                                        temperature = self.temperature)
+        convs_list = [
+            self.create_conv(self.get_judge_prompt(prompt, response))
+            for prompt, response in zip(attack_prompt_list, target_response_list)
+        ]
+        raw_outputs = self.judge_model.batched_generate(
+            convs_list, max_n_tokens=self.max_n_tokens, temperature=self.temperature
+        )
         outputs = [self.process_output(raw_output) for raw_output in raw_outputs]
         return outputs
 
+
+class CeleryJudge(JudgeBase):
+    def __init__(self, args):
+        super(CeleryJudge, self).__init__(args)
+        self.gen_params = {
+            "temperature": args.temperature,
+            "top_p": 0.95,
+            "max_new_tokens": args.judge_max_n_tokens,
+        }
+        self.model = CeleryAgent(args.judge_model, self.gen_params)
+        self.template = "llama-2"
+
+    def create_conv(self, full_prompt):
+        conv = get_conversation_template(self.judge_name)
+        conv.set_system_message(self.system_prompt)
+        conv.append_message(conv.roles[0], full_prompt)
+        return conv
+
+    def score(self, attack_prompt_list, target_response_list):
+        convs_list = [
+            self.create_conv(self.get_judge_prompt(prompt, response))
+            for prompt, response in zip(attack_prompt_list, target_response_list)
+        ]
+        raw_outputs = self.judge_model.batched_generate(
+            convs_list, max_n_tokens=self.max_n_tokens, temperature=self.temperature
+        )
+        outputs = [self.process_output(raw_output) for raw_output in raw_outputs]
+        return outputs
+
+
 class OpenSourceJudge(JudgeBase):
     def __init__(self, judge_model, judge_tokenizer, args):
-        # TODO: Implement open source judge
         raise NotImplementedError
