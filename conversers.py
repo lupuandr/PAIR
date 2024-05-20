@@ -1,5 +1,4 @@
 import common
-
 # from language_models import GPT, Claude, PaLM, HuggingFace
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
@@ -12,6 +11,8 @@ from config import (
     TARGET_TOP_P,
 )
 from agents import CeleryAgent, LlamaGuardAgent
+
+from system_prompts import LLAMA_2_SYSTEM_PROMPT
 
 
 def load_attack_and_target_models(args):
@@ -52,6 +53,7 @@ class AttackLM:
         temperature: float,
         top_p: float,
     ):
+
         self.model_name = model_name
         self.temperature = temperature
         self.max_n_tokens = max_n_tokens
@@ -63,6 +65,7 @@ class AttackLM:
                 "temperature": temperature,
                 "top_p": top_p,
                 "max_new_tokens": max_n_tokens,
+                "max_tokens": max_n_tokens,
             }
             self.model = CeleryAgent(self.model_name, self.gen_params)
             self.template = "llama-2"
@@ -73,7 +76,7 @@ class AttackLM:
             if "vicuna" in model_name or "llama" in model_name:
                 self.model.extend_eos_tokens()
 
-    def get_attack(self, convs_list, prompts_list):
+    def get_attack(self, convs_list, prompts_list, iteration):
         """
         Generates responses for a batch of conversations and prompts using a language model.
         Only valid outputs in proper JSON format are returned. If an output isn't generated
@@ -134,7 +137,7 @@ class AttackLM:
             for i, full_output in enumerate(outputs_list):
                 orig_index = indices_to_regenerate[i]
                 if "gpt" not in self.model_name:
-                    full_output = init_message + full_output + '"}'
+                    full_output = init_message + full_output + '\"}'
 
                 attack_dict, json_str = common.extract_json(full_output)
 
@@ -175,6 +178,7 @@ class TargetLM:
         top_p: float,
         preloaded_model: object = None,
     ):
+
         self.model_name = model_name
         self.temperature = temperature
         self.max_n_tokens = max_n_tokens
@@ -185,9 +189,11 @@ class TargetLM:
                 "temperature": temperature,
                 "top_p": top_p,
                 "max_new_tokens": max_n_tokens,
+                "max_tokens": max_n_tokens,
             }
             self.model = CeleryAgent(self.model_name, self.gen_params)
             self.template = "llama-2"
+            self.system_prompt = LLAMA_2_SYSTEM_PROMPT
         else:
             if preloaded_model is None:
                 self.model, self.template = load_indiv_model(model_name)
@@ -207,6 +213,7 @@ class TargetLM:
             elif "palm" in self.model_name:
                 full_prompts.append(conv.messages[-1][1])
             else:
+                conv.set_system_message(self.system_prompt)
                 conv.append_message(conv.roles[1], None)
                 full_prompts.append(conv.get_prompt())
 

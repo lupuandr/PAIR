@@ -4,6 +4,7 @@ from loggers import WandBLogger
 from judges import load_judge
 from conversers import load_attack_and_target_models
 from common import process_target_response, get_init_msg, conv_template
+import os
 
 
 def main(args):
@@ -38,12 +39,20 @@ def main(args):
             ]
 
         # Get adversarial prompts and improvement
-        extracted_attack_list = attackLM.get_attack(convs_list, processed_response_list)
+        extracted_attack_list = attackLM.get_attack(convs_list, processed_response_list, iteration)
         print("Finished getting adversarial prompts.")
 
         # Extract prompts and improvements
-        adv_prompt_list = [attack["prompt"] for attack in extracted_attack_list]
-        improv_list = [attack["improvement"] for attack in extracted_attack_list]
+        try:
+            adv_prompt_list = [attack["prompt"] for attack in extracted_attack_list]
+            improv_list = [attack["improvement"] for attack in extracted_attack_list]
+        except TypeError:
+            print()
+            print(
+                f"Failed to generate output after `max_n_attack_attempts` attempts. Terminating."
+            )
+            print()
+            break
 
         # Get target responses
         target_response_list = targetLM.get_response(adv_prompt_list)
@@ -86,7 +95,7 @@ if __name__ == "__main__":
     ########### Attack model parameters ##########
     parser.add_argument(
         "--attack-model",
-        default="llama2-70b-unsafe-mp8-celery",
+        default="high-cap-unsafe-celery",
         help="Name of attacking model.",
         choices=[
             "vicuna",
@@ -101,7 +110,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--attack-max-n-tokens",
         type=int,
-        default=10000,
+        default=600,
         help="Maximum number of generated tokens for the attacker.",
     )
     parser.add_argument(
@@ -130,7 +139,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--target-max-n-tokens",
         type=int,
-        default=6000,
+        default=600,
         help="Maximum number of generated tokens for the target.",
     )
     ##################################################
@@ -138,7 +147,7 @@ if __name__ == "__main__":
     ############ Judge model parameters ##########
     parser.add_argument(
         "--judge-model",
-        default="llama2-70b-unsafe-mp8-celery",
+        default="high-cap-unsafe-celery",
         help="Name of judge model.",
         choices=["gpt-3.5-turbo", "gpt-4", "no-judge"],
     )
@@ -201,6 +210,12 @@ if __name__ == "__main__":
         "--category",
         type=str,
         default="bomb",
+        help="Category of jailbreak, for logging purposes.",
+    )
+    parser.add_argument(
+        "--save-dir",
+        type=str,
+        default="/fsx-checkpoints/alupu/PAIR/",
         help="Category of jailbreak, for logging purposes.",
     )
 

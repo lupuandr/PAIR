@@ -3,6 +3,7 @@ import wandb
 import pytz
 from datetime import datetime
 import pandas as pd
+import pickle as pkl
 
 
 class WandBLogger:
@@ -33,6 +34,10 @@ class WandBLogger:
         self.goal = args.goal
         self.jailbreak_prompt = None
         self.jailbreak_response = None
+
+        experiment_name = f"advbench_behav_{args.index}"
+        self.save_dir = os.path.join(args.save_dir, experiment_name)
+        os.makedirs(self.save_dir, exist_ok=True)
 
     def log(
         self, iteration: int, attack_list: list, response_list: list, judge_scores: list
@@ -67,8 +72,26 @@ class WandBLogger:
                 "jailbreak_response": self.jailbreak_response,
                 "data": wandb.Table(data=self.table),
             }
-        )
+            )
 
+        file_name = os.path.join(self.save_dir, f"archive_{iteration}.pkl")
+
+        dict_to_log = {
+            "iteration": iteration,
+            "judge_scores": judge_scores,
+            "mean_judge_score_iter": sum(judge_scores) / len(judge_scores),
+            "is_jailbroken": self.is_jailbroken,
+            "max_judge_score": self.table["judge_scores"].max(),
+            "jailbreak_prompt": self.jailbreak_prompt,
+            "jailbreak_response": self.jailbreak_response,
+            "data": self.table,
+        }
+        
+        with open(file_name, "wb") as f:
+            pkl.dump(dict_to_log, f)
+        print(f"Saved to {file_name}")
+
+        
         self.print_summary_stats(iteration)
 
     def finish(self):

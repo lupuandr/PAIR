@@ -3,27 +3,27 @@ import logging
 from fastchat.model import get_conversation_template
 
 
-def extract_json(s):
+def extract_json(attacker_response):
     """
     Given an output from the attacker LLM, this function extracts the values
     for `improvement` and `adversarial prompt` and returns them as a dictionary.
 
     Args:
-        s (str): The string containing the potential JSON structure.
+        attacker_response (str): The string containing the potential JSON structure.
 
     Returns:
         dict: A dictionary containing the extracted values.
         str: The cleaned JSON string.
     """
     # Extract the string that looks like a JSON
-    start_pos = s.find("{")
-    end_pos = s.find("}") + 1  # +1 to include the closing brace
+    start_pos = attacker_response.find("{")
+    end_pos = attacker_response.find("}") + 1  # +1 to include the closing brace
     if end_pos == -1:
         logging.error("Error extracting potential JSON structure")
-        logging.error(f"Input:\n {s}")
+        logging.error(f"Input:\n {attacker_response}")
         return None, None
 
-    json_str = s[start_pos:end_pos]
+    json_str = attacker_response[start_pos:end_pos]
     json_str = json_str.replace("\n", "")  # Remove all line breaks
 
     try:
