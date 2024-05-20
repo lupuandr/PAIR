@@ -1,5 +1,6 @@
 import common
-from language_models import GPT, Claude, PaLM, HuggingFace
+
+# from language_models import GPT, Claude, PaLM, HuggingFace
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from config import (
@@ -51,7 +52,6 @@ class AttackLM:
         temperature: float,
         top_p: float,
     ):
-
         self.model_name = model_name
         self.temperature = temperature
         self.max_n_tokens = max_n_tokens
@@ -120,7 +120,7 @@ class AttackLM:
 
             # Generate outputs
             if "celery" in self.model_name:
-                outputs_list = self.model.infer(full_prompts_subset)
+                outputs_list = self.model.infer(full_prompts_subset, process=False)
             else:
                 outputs_list = self.model.batched_generate(
                     full_prompts_subset,
@@ -134,7 +134,7 @@ class AttackLM:
             for i, full_output in enumerate(outputs_list):
                 orig_index = indices_to_regenerate[i]
                 if "gpt" not in self.model_name:
-                    full_output = init_message + full_output
+                    full_output = init_message + full_output + '"}'
 
                 attack_dict, json_str = common.extract_json(full_output)
 
@@ -175,7 +175,6 @@ class TargetLM:
         top_p: float,
         preloaded_model: object = None,
     ):
-
         self.model_name = model_name
         self.temperature = temperature
         self.max_n_tokens = max_n_tokens
@@ -212,7 +211,7 @@ class TargetLM:
                 full_prompts.append(conv.get_prompt())
 
         if "celery" in self.model_name:
-            outputs_list = self.model.infer(full_prompts)
+            outputs_list = self.model.infer(full_prompts, process=False)
         else:
             outputs_list = self.model.batched_generate(
                 full_prompts,

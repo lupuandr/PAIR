@@ -37,7 +37,6 @@ class WandBLogger:
     def log(
         self, iteration: int, attack_list: list, response_list: list, judge_scores: list
     ):
-
         df = pd.DataFrame(attack_list)
         df["target_response"] = response_list
         df["judge_scores"] = judge_scores

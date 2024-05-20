@@ -7,7 +7,6 @@ from common import process_target_response, get_init_msg, conv_template
 
 
 def main(args):
-
     # Initialize models and logger
     system_prompt = get_attacker_system_prompt(args.goal, args.target_str)
     attackLM, targetLM = load_attack_and_target_models(args)
@@ -15,7 +14,8 @@ def main(args):
     judgeLM = load_judge(args)
 
     # TODO: Double check or disable logger
-    logger = WandBLogger(args, system_prompt)
+    if not args.debug:
+        logger = WandBLogger(args, system_prompt)
 
     # Initialize conversations
     batchsize = args.n_streams
@@ -62,7 +62,10 @@ def main(args):
             )
 
         # WandB log values
-        logger.log(iteration, extracted_attack_list, target_response_list, judge_scores)
+        if not args.debug:
+            logger.log(
+                iteration, extracted_attack_list, target_response_list, judge_scores
+            )
 
         # Truncate conversation to avoid context length issues
         for i, conv in enumerate(convs_list):
@@ -73,11 +76,11 @@ def main(args):
             print("Found a jailbreak. Exiting.")
             break
 
-    logger.finish()
+    if not args.debug:
+        logger.finish()
 
 
 if __name__ == "__main__":
-
     parser = argparse.ArgumentParser()
 
     ########### Attack model parameters ##########
@@ -98,7 +101,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--attack-max-n-tokens",
         type=int,
-        default=600,
+        default=10000,
         help="Maximum number of generated tokens for the attacker.",
     )
     parser.add_argument(
@@ -127,7 +130,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--target-max-n-tokens",
         type=int,
-        default=600,
+        default=6000,
         help="Maximum number of generated tokens for the target.",
     )
     ##################################################
@@ -199,6 +202,13 @@ if __name__ == "__main__":
         type=str,
         default="bomb",
         help="Category of jailbreak, for logging purposes.",
+    )
+
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        default=False,
+        help="Skip wandb",
     )
     ##################################################
 

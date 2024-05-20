@@ -3,6 +3,7 @@ import re
 from system_prompts import get_judge_system_prompt
 
 from language_models import GPT
+from agents import CeleryAgent, LlamaGuardAgent
 
 
 def load_judge(args):
@@ -77,7 +78,7 @@ class CeleryJudge(JudgeBase):
     def __init__(self, args):
         super(CeleryJudge, self).__init__(args)
         self.gen_params = {
-            "temperature": args.temperature,
+            "temperature": args.judge_temperature,
             "top_p": 0.95,
             "max_new_tokens": args.judge_max_n_tokens,
         }
@@ -85,7 +86,7 @@ class CeleryJudge(JudgeBase):
         self.template = "llama-2"
 
     def create_conv(self, full_prompt):
-        conv = get_conversation_template(self.judge_name)
+        conv = get_conversation_template(self.template)
         conv.set_system_message(self.system_prompt)
         conv.append_message(conv.roles[0], full_prompt)
         return conv
@@ -95,10 +96,14 @@ class CeleryJudge(JudgeBase):
             self.create_conv(self.get_judge_prompt(prompt, response))
             for prompt, response in zip(attack_prompt_list, target_response_list)
         ]
-        raw_outputs = self.judge_model.batched_generate(
-            convs_list, max_n_tokens=self.max_n_tokens, temperature=self.temperature
-        )
+        # Append [/INST], extract prompt
+        full_prompts = []
+        for conv in convs_list:
+            conv.append_message(conv.roles[1], None)
+            full_prompts.append(conv.get_prompt())
+        raw_outputs = self.model.infer(full_prompts, process=False)
         outputs = [self.process_output(raw_output) for raw_output in raw_outputs]
+
         return outputs
 
 

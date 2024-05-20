@@ -42,7 +42,7 @@ class Agent(ABC):
             cleaned_text.strip()
         )  # Removing any extra spaces before and after the cleaned string
 
-    def parse_output(self, text):
+    def parse_output(self, text, parse_brackets=True):
         """
         Parse output to remove excess. Each split below could be a no-op.
         """
@@ -54,7 +54,8 @@ class Agent(ABC):
         text = text.rsplit("Output:", 1)[-1]
         text = text.rsplit("Mutated prompt:", 1)[-1]
         # Remove square brackets (used in conditional mutate)
-        text = text.rsplit("[[", 1)[-1]
-        text = text.rsplit("]]", 1)[0]
+        if parse_brackets:
+            text = text.rsplit("[[", 1)[-1]
+            text = text.rsplit("]]", 1)[0]
 
         return text

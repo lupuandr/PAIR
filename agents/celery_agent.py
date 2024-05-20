@@ -91,12 +91,23 @@ class CeleryAgent(Agent):
         self.do_pbar = do_pbar
         setup_app()
 
-    def infer(self, prompts, nums_only=False, skip_special_tokens=True):
+    def infer(
+        self,
+        prompts,
+        process=True,
+        parse_brackets=False,
+        nums_only=False,
+        skip_special_tokens=True,
+    ):
         tasks = [make_task(self.queue_name, p, self.gen_params) for p in prompts]
         results = dispatch_tasks(tasks, self.do_pbar)
 
         # TODO: We assume one generation per task, but in future this may not be true.
         # split response in case target repeats "Output:"
-        return_strings = [self.parse_output(r["choices"][0]["text"]) for r in results]
-        proc_return_strings = self.process_outputs(return_strings, nums_only)
-        return proc_return_strings
+        return_strings = [r["choices"][0]["text"] for r in results]
+        if process:
+            return_strings = [
+                self.parse_output(r, parse_brackets) for r in return_strings
+            ]
+            return_strings = self.process_outputs(return_strings, nums_only)
+        return return_strings
